@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT Web Subscription</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f7fa;
+            gap: 25px;
+        }
+        .card {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 280px;
+            height: 220px;
+            text-align: center;
+            transition: transform 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 220px; /* Ensure minimum height */
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .card h2 {
+            margin: 0 0 10px;
+            font-size: 22px;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        .card .values {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .card p {
+            margin: 5px 0;
+            font-size: 40px;
+            font-weight: bold;
+            color: #2980b9;
+        }
+        .card p .unit {
+            font-size: 18px;
+            color: #7f8c8d;
+            font-weight: normal;
+            margin-left: 5px;
+        }
+        #loadDisplay {
+            font-size: 40px;
+        }
+        #energyDisplay {
+            font-size: 28px;
+            margin-top: 5px;
+        }
+        #energyDisplay .unit {
+            font-size: 16px;
+        }
+        /* Last update styling */
+        .last-update {
+            font-size: 12px !important; /* Force 8px with !important */
+            color: #17202a !important;
+            opacity: 0.5;
+            text-align: left;
+            margin-top: 10px;
+            padding: 0 5px;
+            line-height: 1; /* Tighten line spacing */
+        }
+    </style>
+</head>
+<body>
+    <!-- Card 1: Generator Gas Pressure -->
+    <div class="card">
+        <h2>Generator Gas Pressure</h2>
+        <div class="values">
+            <p id="valueDisplay">--<span class="unit">PSI</span></p>
+        </div>
+        <p class="last-update" id="valueLastUpdate">Last update: --</p>
+    </div>
+
+    <!-- Card 2: Load and Energy -->
+    <div class="card">
+        <h2>Load and Energy</h2>
+        <div class="values">
+            <p id="loadDisplay">--<span class="unit">kW</span></p>
+            <p id="energyDisplay">--<span class="unit">kWh</span></p>
+        </div>
+        <p class="last-update" id="loadLastUpdate">Last update: --</p>
+    </div>
+
+    <!-- Card 3: Boiler Gas Pressure -->
+    <div class="card">
+        <h2>Boiler Gas Pressure</h2>
+        <div class="values">
+            <p id="boilerValueDisplay">--<span class="unit">PSI</span></p>
+        </div>
+        <p class="last-update" id="boilerLastUpdate">Last update: --</p>
+    </div>
+
+    <script>
+        // MQTT Client Configuration
+        const client = mqtt.connect('ws://techlinkdynamics.com:9001', {
+            username: 'aminur_rahman',
+            password: 'Ars-05041988'
+        });
+
+        // Function to format the current timestamp
+        function getFormattedTimestamp() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour12: true });
+            const date = now.toLocaleDateString('en-US');
+            return `${time}, ${date}`;
+        }
+
+        client.on('connect', function () {
+            console.log("✅ Connected to MQTT Broker");
+            
+            client.subscribe('sensor/mappedValue', function (err) {
+                if (!err) console.log("✅ Subscribed to topic 'sensor/mappedValue'");
+                else console.error("❌ Subscription error: ", err);
+            });
+
+            client.subscribe('MDL', function (err) {
+                if (!err) console.log("✅ Subscribed to topic 'MDL'");
+                else console.error("❌ Subscription error: ", err);
+            });
+
+            client.subscribe('data/mappedValue', function (err) {
+                if (!err) console.log("✅ Subscribed to topic 'data/mappedValue'");
+                else console.error("❌ Subscription error: ", err);
+            });
+        });
+
+        client.on('message', function (topic, message) {
+            console.log("📩 Received message on topic: " + topic);
+            const timestamp = getFormattedTimestamp();
+
+            if (topic === 'sensor/mappedValue') {
+                const msg = message.toString();
+                document.getElementById("valueDisplay").innerHTML = `${msg}<span class="unit">PSI</span>`;
+                document.getElementById("valueLastUpdate").textContent = `Last update: ${timestamp}`;
+            } else if (topic === 'MDL') {
+                try {
+                    const jsonData = JSON.parse(message.toString());
+                    document.getElementById("loadDisplay").innerHTML = `${jsonData.Load}<span class="unit">kW</span>`;
+                    document.getElementById("energyDisplay").innerHTML = `${jsonData.E_Energy}<span class="unit">kWh</span>`;
+                    document.getElementById("loadLastUpdate").textContent = `Last update: ${timestamp}`;
+                } catch (error) {
+                    console.error("❌ Error parsing JSON data: ", error);
+                }
+            } else if (topic === 'data/mappedValue') {
+                const msg = message.toString();
+                document.getElementById("boilerValueDisplay").innerHTML = `${msg}<span class="unit">PSI</span>`;
+                document.getElementById("boilerLastUpdate").textContent = `Last update: ${timestamp}`;
+            }
+        });
+
+        client.on('error', function (err) {
+            console.error("❌ MQTT Connection error: ", err);
+            alert("MQTT Connection Error! Check the console.");
+        });
+    </script>
+</body>
+</html>
